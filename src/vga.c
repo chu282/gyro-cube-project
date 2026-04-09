@@ -70,7 +70,7 @@ void drawPixel(int x, int y, char color) {
 }
 
 // DMA channels - 0 sends color data, 1 reconfigures and restarts 0
-void init_VGA() {
+void init_vga() {
     PIO pio = pio0;
 
     // Our assembled program needs to be loaded into this PIO's instruction

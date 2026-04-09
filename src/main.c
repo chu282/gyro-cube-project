@@ -9,7 +9,7 @@ int main() {
     stdio_init_all();
 
     // initialize VGA
-    init_VGA();
+    init_vga();
 
     for (;;) {
         printf("Hello world!\n");
