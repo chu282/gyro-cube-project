@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "hardware/adc.h"
 #include "hardware/dma.h"
+#include "adc.h"
 
 uint32_t adc_fifo_out = 0;
 
