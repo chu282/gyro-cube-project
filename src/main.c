@@ -4,6 +4,7 @@
 #include "hardware/pio.h"
 #include "hardware/dma.h"
 #include "vga.c"
+#include "adc.c"
 
 int main() {
     stdio_init_all();
