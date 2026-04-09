@@ -6,6 +6,7 @@
 #include "hsync.pio.h"
 #include "vsync.pio.h"
 #include "rgb.pio.h"
+#include "vga.h"
 
 // screen
 #define SCREEN_WIDTH 1024
@@ -51,7 +52,7 @@ char* address_pointer = &vga_data[0];
 // Note that because information is passed to the PIO state machines through
 // a DMA channel, we only need to modify the contents of the array and the
 // pixels will be automatically updated on the screen.
-void drawPixel(int x, int y, char color) {
+void draw_pixel(int x, int y, char color) {
     // Range checks
     if (x > SCREEN_WIDTH - 1) x = SCREEN_WIDTH - 1;
     if (x < 0) x = 0;
