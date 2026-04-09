@@ -11,6 +11,7 @@ int main() {
 
     // initialize VGA
     init_VGA();
+    init_adc(); // adc_fifo_out will contain voltage levels from 0-4095
 
     for (;;) {
         printf("Hello world!\n");

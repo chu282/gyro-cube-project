@@ -13,9 +13,8 @@ void init_adc() {
     adc_run(true);
 
     gpio_set_dir(45, GPIO_IN);
-}
 
-void init_dma() {
+    // dma
     dma_hw->ch[0].read_addr = &adc_hw->fifo;
     dma_hw->ch[0].write_addr = &adc_fifo_out;
     dma_hw->ch[0].transfer_count = (1 << DMA_CH0_TRANS_COUNT_MODE_LSB) | 1; 
@@ -25,12 +24,7 @@ void init_dma() {
            (DREQ_ADC << DMA_CH0_CTRL_TRIG_TREQ_SEL_LSB) | 
            (DMA_CH0_CTRL_TRIG_EN_BITS);
     dma_hw->ch[0].ctrl_trig = temp;
-}
 
-void init_adc_dma() {
-    // fill in
-    init_dma();
-    init_adc();
     adc_hw->fcs |= ADC_FCS_DREQ_EN_BITS;
     adc_hw->fcs |= ADC_FCS_EN_BITS;
 }
