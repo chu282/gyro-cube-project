@@ -7,6 +7,7 @@
 #include "vsync.pio.h"
 #include "rgb.pio.h"
 #include "vga.h"
+#include "hardware/irq.h"
 
 /*
 Most of the VGA implementation is taken straight from https://vanhunteradams.com/Pico/VGA/VGA.html, 
@@ -35,7 +36,11 @@ including hsync.pio, vsync.pio, and rgb.pio.
 #define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // total pixels / 2
 
 uint8_t vga_data[TXCOUNT];
-char* address_pointer = &vga_data[0];
+uint8_t* address_pointer = &vga_data[0];
+PIO pio;
+uint vsync_sm;
+volatile bool vsync_flag = false;
+static int s_dma_chan_1;
 
 // A function for drawing a pixel with a specified color.
 // Note that because information is passed to the PIO state machines through
@@ -76,9 +81,14 @@ void draw_colorboard() {
     }
 }
 
+void dma_handler() {
+    dma_hw->ints0 = 1 << s_dma_chan_1;
+    vsync_flag = true;
+}
+
 // DMA channels - 0 sends color data, 1 reconfigures and restarts 0
 void init_vga() {
-    PIO pio = pio0;
+    pio = pio0;
 
     // Our assembled program needs to be loaded into this PIO's instruction
     // memory. This SDK function will find a location (offset) in the
@@ -96,7 +106,7 @@ void init_vga() {
 
     // Manually select a few state machines from pio instance pio0.
     uint hsync_sm = 0;
-    uint vsync_sm = 1;
+    vsync_sm = 1;
     uint rgb_sm = 2;
     pio_sm_claim(pio, hsync_sm);
     pio_sm_claim(pio, vsync_sm);
@@ -112,6 +122,7 @@ void init_vga() {
 
     int rgb_chan_0 = dma_claim_unused_channel(true);
     int rgb_chan_1 = dma_claim_unused_channel(true);
+    s_dma_chan_1 = rgb_chan_1;
 
     // Channel Zero (sends color data to PIO VGA machine)
     dma_channel_config c0 = dma_channel_get_default_config(rgb_chan_0);  // default configs
@@ -153,7 +164,6 @@ void init_vga() {
     pio_sm_put_blocking(pio, vsync_sm, V_ACTIVE);
     pio_sm_put_blocking(pio, rgb_sm, RGB_ACTIVE);
 
-
     // Start the two pio machine IN SYNC
     // Note that the RGB state machine is running at full speed,
     // so synchronization doesn't matter for that one. But, we'll
@@ -164,5 +174,9 @@ void init_vga() {
     // will be continously DMA's to the PIO machines that are driving the screen.
     // To change the contents of the screen, we need only change the contents
     // of that array.
-    dma_start_channel_mask((1u << rgb_chan_0)) ;
+    dma_start_channel_mask((1u << rgb_chan_0));
+
+    dma_channel_set_irq0_enabled(rgb_chan_1, true);
+    irq_set_exclusive_handler(DMA_IRQ_0, dma_handler);
+    irq_set_enabled(DMA_IRQ_0, true);
 }

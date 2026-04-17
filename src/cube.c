@@ -10,7 +10,9 @@
 
 #include <stdio.h>
 #include <string.h>
-
+#include "hardware/pio.h"
+#include "vga.h"
+#include <stdbool.h>
 
 // ---------------------------------------------------------------------------
 // HARDWARE
@@ -54,6 +56,10 @@ static bool     s_btn_lock_prev = true;
 static uint32_t s_btn_home_ms   = 0;
 static uint32_t s_btn_lock_ms   = 0;
 #define DEBOUNCE_MS 50
+
+extern uint vsync_sm;
+extern PIO pio;
+extern volatile bool vsync_flag;
 
 // ---------------------------------------------------------------------------
 // ERROR
@@ -256,6 +262,8 @@ void cube_run(void) {
         clear_screen();
 
         for (int i = 0; i < s_model.num_edges; i++) {
+            while (!vsync_flag);
+            vsync_flag = false;
             Point3D *a = &projected[s_model.edges[i][0]];
             Point3D *b = &projected[s_model.edges[i][1]];
 

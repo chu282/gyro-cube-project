@@ -47,7 +47,7 @@ void imu_init(i2c_inst_t *i2c, uint sda_pin, uint scl_pin, uint baud) {
     gpio_pull_up(sda_pin);
     gpio_pull_up(scl_pin);
 
-    sleep_ms(100);   // let the MPU6050 power on
+    sleep_ms(500);   // let the MPU6050 power on
 
     // Wake from sleep, use PLL with X-axis gyro reference (more stable than
     // the internal 8 MHz oscillator)

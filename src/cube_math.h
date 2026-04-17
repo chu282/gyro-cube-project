@@ -60,5 +60,5 @@ void clear_screen(void);
 // vga.c is #included (not compiled separately) by main.c, so these resolve
 // at link time from main.c's translation unit.
 // ---------------------------------------------------------------------------
-extern void drawPixel(int x, int y, char color);
+extern void draw_pixel(int x, int y, char color);
 extern char vga_data[];
