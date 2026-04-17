@@ -1,4 +1,4 @@
-#include "math.h"
+#include "cube_math.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -9,8 +9,8 @@
 
 Point3D point3d_rotate_x(Point3D p, float deg) {
     float rad  = deg * (float)M_PI / 180.0f;
-    float cosa = cosf(rad);
-    float sina = sinf(rad);
+    float cosa = cos(rad);
+    float sina = sin(rad);
     return (Point3D){
         .x = p.x,
         .y = p.y * cosa - p.z * sina,
@@ -20,8 +20,8 @@ Point3D point3d_rotate_x(Point3D p, float deg) {
 
 Point3D point3d_rotate_y(Point3D p, float deg) {
     float rad  = deg * (float)M_PI / 180.0f;
-    float cosa = cosf(rad);
-    float sina = sinf(rad);
+    float cosa = cos(rad);
+    float sina = sin(rad);
     return (Point3D){
         .x = p.z * sina + p.x * cosa,
         .y = p.y,
@@ -31,8 +31,8 @@ Point3D point3d_rotate_y(Point3D p, float deg) {
 
 Point3D point3d_rotate_z(Point3D p, float deg) {
     float rad  = deg * (float)M_PI / 180.0f;
-    float cosa = cosf(rad);
-    float sina = sinf(rad);
+    float cosa = cos(rad);
+    float sina = sin(rad);
     return (Point3D){
         .x = p.x * cosa - p.y * sina,
         .y = p.x * sina + p.y * cosa,

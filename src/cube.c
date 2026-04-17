@@ -2,7 +2,8 @@
 #include "math.h"
 #include "zoom.h"
 #include "imu.h"
-#include "sd_card.h"        // sd_init_driver()
+#include "cube_math.h"
+// #include "sd_card.h"        // sd_init_driver()
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include "pico/platform.h"  // tight_loop_contents()
@@ -57,10 +58,10 @@ static uint32_t s_btn_lock_ms   = 0;
 // ---------------------------------------------------------------------------
 // ERROR
 // ---------------------------------------------------------------------------
-static void halt_with_error(const char *msg) {
-    printf("FATAL: %s\n", msg);
-    while (1) tight_loop_contents();
-}
+// static void halt_with_error(const char *msg) {
+//     printf("FATAL: %s\n", msg);
+//     while (1) tight_loop_contents();
+// }
 
 // ---------------------------------------------------------------------------
 // BUTTON
@@ -79,8 +80,52 @@ static bool button_fell(uint pin, bool *prev, uint32_t *last_ms) {
 }
 
 // ---------------------------------------------------------------------------
-// BINARY LOADER
+// TEST MODEL SWITCH
+// Define USE_HARDCODED_MODEL to skip the SD card entirely and use the
+// built-in unit cube below.  Comment it out to load from model.bin instead.
 // ---------------------------------------------------------------------------
+#define USE_HARDCODED_MODEL
+
+#ifdef USE_HARDCODED_MODEL
+// Unit cube: 8 vertices at (±1, ±1, ±1), 12 edges.
+// The projection in math.c adds SCREEN_WIDTH/2 and SCREEN_HEIGHT/2 as the
+// screen-centre offset, so the cube sits in the middle of the display.
+static void load_hardcoded_cube(SimpleModel *model) {
+    model->num_vertices = 8;
+    model->num_edges    = 12;
+
+    // Vertices
+    model->vertices[0] = (Point3D){ -1.0f, -1.0f, -1.0f };
+    model->vertices[1] = (Point3D){  1.0f, -1.0f, -1.0f };
+    model->vertices[2] = (Point3D){  1.0f,  1.0f, -1.0f };
+    model->vertices[3] = (Point3D){ -1.0f,  1.0f, -1.0f };
+    model->vertices[4] = (Point3D){ -1.0f, -1.0f,  1.0f };
+    model->vertices[5] = (Point3D){  1.0f, -1.0f,  1.0f };
+    model->vertices[6] = (Point3D){  1.0f,  1.0f,  1.0f };
+    model->vertices[7] = (Point3D){ -1.0f,  1.0f,  1.0f };
+
+    // Edges: back face, front face, then 4 connecting pillars
+    model->edges[0][0] = 0; model->edges[0][1] = 1;   // back bottom
+    model->edges[1][0] = 1; model->edges[1][1] = 2;   // back right
+    model->edges[2][0] = 2; model->edges[2][1] = 3;   // back top
+    model->edges[3][0] = 3; model->edges[3][1] = 0;   // back left
+
+    model->edges[4][0] = 4; model->edges[4][1] = 5;   // front bottom
+    model->edges[5][0] = 5; model->edges[5][1] = 6;   // front right
+    model->edges[6][0] = 6; model->edges[6][1] = 7;   // front top
+    model->edges[7][0] = 7; model->edges[7][1] = 4;   // front left
+
+    model->edges[8][0]  = 0; model->edges[8][1]  = 4;  // pillar bottom-left
+    model->edges[9][0]  = 1; model->edges[9][1]  = 5;  // pillar bottom-right
+    model->edges[10][0] = 2; model->edges[10][1] = 6;  // pillar top-right
+    model->edges[11][0] = 3; model->edges[11][1] = 7;  // pillar top-left
+}
+#endif  // USE_HARDCODED_MODEL
+
+// ---------------------------------------------------------------------------
+// BINARY LOADER (used when USE_HARDCODED_MODEL is NOT defined)
+// ---------------------------------------------------------------------------
+#ifndef USE_HARDCODED_MODEL
 static bool simple_model_load_bin(const char *path, SimpleModel *model) {
     FIL file;
     UINT br;
@@ -120,20 +165,24 @@ static bool simple_model_load_bin(const char *path, SimpleModel *model) {
     f_close(&file);
     return true;
 }
+#endif  // !USE_HARDCODED_MODEL
 
 // ---------------------------------------------------------------------------
 // CUBE INITIALIZE
 // ---------------------------------------------------------------------------
 void cube_init(void) {
 
-    // ---- SD CARD ----
+    // ---- MODEL LOAD ----
+#ifdef USE_HARDCODED_MODEL
+    load_hardcoded_cube(&s_model);          // no SD card needed
+#else
     if (!sd_init_driver()) {
         halt_with_error("SD init failed");
     }
-
     if (!simple_model_load_bin(MODEL_PATH, &s_model)) {
         halt_with_error("Failed to load model.bin");
     }
+#endif
 
     // ---- IMU ----
     s_i2c = IMU_I2C_PORT;

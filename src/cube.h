@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math.h"   // Point3D
+#include "cube_math.h"
 
 // ---------------------------------------------------------------------------
 // MODEL LIMITS & PATH
