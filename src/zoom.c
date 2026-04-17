@@ -43,6 +43,8 @@ float zoom_get_fov(void) {
     // ---- Step 2: Normalize ----
     float t = raw / 4095.0f;
 
+    t = 0.5;
+
     // ---- Step 3: Map to FOV range ----
     float target_fov = FOV_MIN + t * (FOV_MAX - FOV_MIN);
 
