@@ -13,7 +13,7 @@
 // ----- //
 
 #define vsync_wrap_target 1
-#define vsync_wrap 13
+#define vsync_wrap 14
 #define vsync_pio_version 0
 
 static const uint16_t vsync_program_instructions[] = {
@@ -23,22 +23,23 @@ static const uint16_t vsync_program_instructions[] = {
     0x20c0, //  2: wait   1 irq, 0
     0xc001, //  3: irq    nowait 1
     0x0042, //  4: jmp    x--, 2
-    0xe049, //  5: set    y, 9
+    0xe042, //  5: set    y, 2
     0x20c0, //  6: wait   1 irq, 0
     0x0086, //  7: jmp    y--, 6
     0xe000, //  8: set    pins, 0
-    0x20c0, //  9: wait   1 irq, 0
+    0xe049, //  9: set    y, 9
     0x20c0, // 10: wait   1 irq, 0
-    0xe05f, // 11: set    y, 31
-    0x38c0, // 12: wait   1 irq, 0        side 1
-    0x008c, // 13: jmp    y--, 12
+    0x008a, // 11: jmp    y--, 10
+    0xe04a, // 12: set    y, 10
+    0x38c0, // 13: wait   1 irq, 0        side 1
+    0x008d, // 14: jmp    y--, 13
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program vsync_program = {
     .instructions = vsync_program_instructions,
-    .length = 14,
+    .length = 15,
     .origin = -1,
     .pio_version = vsync_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -64,7 +65,7 @@ static inline void vsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     sm_config_set_set_pins(&c, pin, 1);
     sm_config_set_sideset_pins(&c, pin);
     // Set clock division (div by 5 for 25 MHz state machine)
-    sm_config_set_clkdiv(&c, 6) ;
+    sm_config_set_clkdiv(&c, 3.0f) ;
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
     // pio_gpio_init(pio, pin+1);

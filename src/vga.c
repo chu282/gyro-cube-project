@@ -6,10 +6,18 @@
 #include "hsync.pio.h"
 #include "vsync.pio.h"
 #include "rgb.pio.h"
+#include "vga.h"
+
+/*
+Most of the VGA implementation is taken straight from https://vanhunteradams.com/Pico/VGA/VGA.html, 
+including hsync.pio, vsync.pio, and rgb.pio. 
+*/
 
 // screen
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 600
+// #define SCREEN_WIDTH 640
+// #define SCREEN_HEIGHT 360
 
 // gpio pins
 #define GPIO_HSYNC    10
@@ -20,38 +28,21 @@
 #define GPIO_GREEN_HI 15
 
 // VGA timing constants
-#define FRONTPORCH 16
+#define FRONTPORCH 48
 #define H_ACTIVE (SCREEN_WIDTH + FRONTPORCH - 1) // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE (SCREEN_HEIGHT - 1) // (active - 1)
 #define RGB_ACTIVE (SCREEN_WIDTH / 2 - 1) // (horizontal active)/2 - 1
 #define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // total pixels / 2
 
-// colors
-#define BLACK        0   // 0000
-#define RED          1   // 0001
-#define BLUE         2   // 0010
-#define MAGENTA      3   // 0011 (R+B)
-#define DARK_GREEN   4   // 0100 (G_Lo)
-#define DARK_YELLOW  5   // 0101 (R+G_Lo)
-#define DARK_CYAN    6   // 0110 (B+G_Lo)
-#define DARK_GRAY    7   // 0111 (R+B+G_Lo)
-#define MED_GREEN    8   // 1000 (G_Hi)
-#define ORANGE       9   // 1001 (R+G_Hi)
-#define LIGHT_BLUE   10  // 1010 (B+G_Hi)
-#define PINK         11  // 1011 (R+B+G_Hi)
-#define BRIGHT_GREEN 12  // 1100 (G_Lo+G_Hi)
-#define YELLOW       13  // 1101 (R+G_Lo+G_Hi)
-#define CYAN         14  // 1110 (B+G_Lo+G_Hi)
-#define WHITE        15  // 1111 (All Pins)
-
-char vga_data[TXCOUNT];
+uint8_t vga_data[TXCOUNT];
 char* address_pointer = &vga_data[0];
 
 // A function for drawing a pixel with a specified color.
 // Note that because information is passed to the PIO state machines through
 // a DMA channel, we only need to modify the contents of the array and the
 // pixels will be automatically updated on the screen.
-void drawPixel(int x, int y, char color) {
+void draw_pixel(int x, int y, char color) {
+    color = color & 0x0F;
     // Range checks
     if (x > SCREEN_WIDTH - 1) x = SCREEN_WIDTH - 1;
     if (x < 0) x = 0;
@@ -62,10 +53,26 @@ void drawPixel(int x, int y, char color) {
     int pixel = ((SCREEN_WIDTH * y) + x);
 
     if (pixel & 1) {
-        vga_data[pixel>>1] |= (color << 4);
+        vga_data[pixel>>1] = (vga_data[pixel>>1] & 0x0F) | (color << 4);
     }
     else {
-        vga_data[pixel>>1] |= (color);
+        vga_data[pixel>>1] = (vga_data[pixel>>1] & 0xF0) | color;
+    }
+}
+
+void draw_rect(int x, int y, int w, int h, char color) {
+  for (int i = 0; i < w; i++) {
+    for (int j = 0; j < h; j++) {
+        draw_pixel(x + i, y + j, color);
+    }
+  }
+}
+
+void draw_colorboard() {
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            draw_rect(64 * i, 38 * j, 64, 38, (i + j) % 16);
+        }
     }
 }
 
@@ -91,6 +98,9 @@ void init_vga() {
     uint hsync_sm = 0;
     uint vsync_sm = 1;
     uint rgb_sm = 2;
+    pio_sm_claim(pio, hsync_sm);
+    pio_sm_claim(pio, vsync_sm);
+    pio_sm_claim(pio, rgb_sm);
 
     // Call the initialization functions that are defined within each PIO file.
     // Why not create these programs here? By putting the initialization function in
@@ -100,8 +110,8 @@ void init_vga() {
     vsync_program_init(pio, vsync_sm, vsync_offset, GPIO_VSYNC);
     rgb_program_init(pio, rgb_sm, rgb_offset, GPIO_RED);
 
-    int rgb_chan_0 = 0;
-    int rgb_chan_1 = 1;
+    int rgb_chan_0 = dma_claim_unused_channel(true);
+    int rgb_chan_1 = dma_claim_unused_channel(true);
 
     // Channel Zero (sends color data to PIO VGA machine)
     dma_channel_config c0 = dma_channel_get_default_config(rgb_chan_0);  // default configs
@@ -135,4 +145,24 @@ void init_vga() {
         1,                                  // Number of transfers, in this case each is 4 byte
         false                               // Don't start immediately.
     );
+
+    // Initialize PIO state machine counters. This passes the information to the state machines
+    // that they retrieve in the first 'pull' instructions, before the .wrap_target directive
+    // in the assembly. Each uses these values to initialize some counting registers.
+    pio_sm_put_blocking(pio, hsync_sm, H_ACTIVE);
+    pio_sm_put_blocking(pio, vsync_sm, V_ACTIVE);
+    pio_sm_put_blocking(pio, rgb_sm, RGB_ACTIVE);
+
+
+    // Start the two pio machine IN SYNC
+    // Note that the RGB state machine is running at full speed,
+    // so synchronization doesn't matter for that one. But, we'll
+    // start them all simultaneously anyway.
+    pio_enable_sm_mask_in_sync(pio, ((1u << hsync_sm) | (1u << vsync_sm) | (1u << rgb_sm)));
+
+    // Start DMA channel 0. Once started, the contents of the pixel color array
+    // will be continously DMA's to the PIO machines that are driving the screen.
+    // To change the contents of the screen, we need only change the contents
+    // of that array.
+    dma_start_channel_mask((1u << rgb_chan_0)) ;
 }
