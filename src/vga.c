@@ -15,8 +15,10 @@ including hsync.pio, vsync.pio, and rgb.pio.
 */
 
 // screen
-#define SCREEN_WIDTH 1024
-#define SCREEN_HEIGHT 600
+// #define SCREEN_WIDTH 1024
+// #define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
 
 // gpio pins
 #define GPIO_HSYNC    10
@@ -27,7 +29,7 @@ including hsync.pio, vsync.pio, and rgb.pio.
 #define GPIO_GREEN_HI 15
 
 // VGA timing constants
-#define FRONTPORCH 48
+#define FRONTPORCH 16
 #define H_ACTIVE (SCREEN_WIDTH + FRONTPORCH - 1) // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE (SCREEN_HEIGHT - 1) // (active - 1)
 #define RGB_ACTIVE (SCREEN_WIDTH / 2 - 1) // (horizontal active)/2 - 1

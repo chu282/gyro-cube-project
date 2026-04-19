@@ -23,14 +23,14 @@ static const uint16_t vsync_program_instructions[] = {
     0x20c0, //  2: wait   1 irq, 0
     0xc001, //  3: irq    nowait 1
     0x0042, //  4: jmp    x--, 2
-    0xe042, //  5: set    y, 2
+    0xe049, //  5: set    y, 9
     0x20c0, //  6: wait   1 irq, 0
     0x0086, //  7: jmp    y--, 6
     0xe000, //  8: set    pins, 0
-    0xe049, //  9: set    y, 9
+    0xe041, //  9: set    y, 1
     0x20c0, // 10: wait   1 irq, 0
     0x008a, // 11: jmp    y--, 10
-    0xe04a, // 12: set    y, 10
+    0xe05f, // 12: set    y, 31
     0x38c0, // 13: wait   1 irq, 0        side 1
     0x008d, // 14: jmp    y--, 13
             //     .wrap
