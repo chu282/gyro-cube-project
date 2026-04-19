@@ -29,13 +29,16 @@
 // PROJECTION
 // ---------------------------------------------------------------------------
 #define PROJ_FOV        300.0f
-#define PROJ_DISTANCE     2.0f
+#define PROJ_DISTANCE     3.0f
 
 #define ACCEL_SCALE  256.0f
 
-#define HOME_ANGLE_X   45.0f
-#define HOME_ANGLE_Y  -35.264f
-#define HOME_ANGLE_Z    0.0f
+// #define HOME_ANGLE_X   45.0f
+// #define HOME_ANGLE_Y  -35.264f
+// #define HOME_ANGLE_Z    0.0f
+#define HOME_ANGLE_X   10.0f
+#define HOME_ANGLE_Y  100.0f
+#define HOME_ANGLE_Z    30.0f
 
 #define DRAW_COLOR  15
 
@@ -257,7 +260,7 @@ void cube_run(void) {
             r = point3d_rotate_y(r, angle_y);
             r = point3d_rotate_z(r, angle_z);
             
-            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 70, PROJ_DISTANCE);
+            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 200, PROJ_DISTANCE);
         }
 
         // ---- RENDER ----

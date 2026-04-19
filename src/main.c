@@ -33,7 +33,8 @@ int main() {
     //     }
     // }
     
-    printf("heljkfldsjsdf");
+    // init_chardisp_pins();
+    // cd_init();
     cube_init();
     cube_run();
     // draw_colorboard();

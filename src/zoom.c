@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 // ADC CONFIGURATION
 // ---------------------------------------------------------------------------
-#define ZOOM_ADC_GPIO   26
+#define ZOOM_ADC_GPIO   45
 #define ZOOM_ADC_INPUT   0   // ADC0
 
 // ---------------------------------------------------------------------------
@@ -43,14 +43,12 @@ float zoom_get_fov(void) {
     // ---- Step 2: Normalize ----
     float t = raw / 4095.0f;
 
-    t = 0.5;
-
     // ---- Step 3: Map to FOV range ----
     float target_fov = FOV_MIN + t * (FOV_MAX - FOV_MIN);
 
     // ---- Step 4: Smooth (low-pass filter) ----
     s_smooth_fov = SMOOTH_ALPHA * s_smooth_fov +
                    (1.0f - SMOOTH_ALPHA) * target_fov;
-
+    cd_display1("ECE 362 is the  ");
     return s_smooth_fov;
 }
