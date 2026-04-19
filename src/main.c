@@ -36,6 +36,7 @@ int main() {
     printf("heljkfldsjsdf");
     cube_init();
     cube_run();
+    // draw_colorboard();
 
     // draw_line(100, 100, 200, 200, WHITE);
     
