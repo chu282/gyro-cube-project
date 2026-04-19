@@ -4,8 +4,8 @@
 #include <string.h>
 
 // Screen dimensions — must match the values in vga.c
-#define SCREEN_WIDTH  1024
-#define SCREEN_HEIGHT 600
+#define SCREEN_WIDTH  640
+#define SCREEN_HEIGHT 480
 
 // Two pixels are packed per byte in vga_data[], so the buffer is half the
 // total pixel count.

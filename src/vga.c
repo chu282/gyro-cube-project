@@ -30,7 +30,7 @@ including hsync.pio, vsync.pio, and rgb.pio.
 
 // VGA timing constants
 #define FRONTPORCH 16
-#define H_ACTIVE (SCREEN_WIDTH + FRONTPORCH - 1) // (active + frontporch - 1) - one cycle delay for mov
+#define H_ACTIVE (SCREEN_WIDTH + 16 - 1) // (active + frontporch - 1) - one cycle delay for mov
 #define V_ACTIVE (SCREEN_HEIGHT - 1) // (active - 1)
 #define RGB_ACTIVE (SCREEN_WIDTH / 2 - 1) // (horizontal active)/2 - 1
 #define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // total pixels / 2
@@ -139,7 +139,7 @@ void init_vga() {
         rgb_chan_0,                 // Channel to be configured
         &c0,                        // The configuration we just created
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
-        &front_buf,                 // The initial read address (pixel color array)
+        front_buf,                 // The initial read address (pixel color array)
         TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
         false                       // Don't start immediately.
     );

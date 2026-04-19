@@ -249,7 +249,7 @@ void cube_run(void) {
         // ---- TRANSFORM ----
         Point3D projected[MAX_VERTICES];
 
-        float dynamic_fov = zoom_get_fov();
+        // float dynamic_fov = zoom_get_fov();
 
         for (int i = 0; i < s_model.num_vertices; i++) {
             Point3D r = s_model.vertices[i];
@@ -257,7 +257,7 @@ void cube_run(void) {
             r = point3d_rotate_y(r, angle_y);
             r = point3d_rotate_z(r, angle_z);
             
-            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 100, PROJ_DISTANCE);
+            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 70, PROJ_DISTANCE);
         }
 
         // ---- RENDER ----
