@@ -17,8 +17,6 @@ including hsync.pio, vsync.pio, and rgb.pio.
 // screen
 #define SCREEN_WIDTH 1024
 #define SCREEN_HEIGHT 600
-// #define SCREEN_WIDTH 640
-// #define SCREEN_HEIGHT 360
 
 // gpio pins
 #define GPIO_HSYNC    10
@@ -35,8 +33,11 @@ including hsync.pio, vsync.pio, and rgb.pio.
 #define RGB_ACTIVE (SCREEN_WIDTH / 2 - 1) // (horizontal active)/2 - 1
 #define TXCOUNT (SCREEN_WIDTH * SCREEN_HEIGHT / 2) // total pixels / 2
 
-uint8_t vga_data[TXCOUNT];
-uint8_t* address_pointer = &vga_data[0];
+uint8_t vga_data_buf_1[TXCOUNT];
+uint8_t vga_data_buf_2[TXCOUNT];
+uint8_t* front_buf = vga_data_buf_1;
+uint8_t* back_buf = vga_data_buf_2;
+uint8_t* address_pointer = &vga_data_buf_1[0];
 PIO pio;
 uint vsync_sm;
 volatile bool vsync_flag = false;
@@ -58,10 +59,10 @@ void draw_pixel(int x, int y, char color) {
     int pixel = ((SCREEN_WIDTH * y) + x);
 
     if (pixel & 1) {
-        vga_data[pixel>>1] = (vga_data[pixel>>1] & 0x0F) | (color << 4);
+        back_buf[pixel>>1] = (back_buf[pixel>>1] & 0x0F) | (color << 4);
     }
     else {
-        vga_data[pixel>>1] = (vga_data[pixel>>1] & 0xF0) | color;
+        back_buf[pixel>>1] = (back_buf[pixel>>1] & 0xF0) | color;
     }
 }
 
@@ -136,7 +137,7 @@ void init_vga() {
         rgb_chan_0,                 // Channel to be configured
         &c0,                        // The configuration we just created
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
-        &vga_data,                  // The initial read address (pixel color array)
+        &front_buf,              // The initial read address (pixel color array)
         TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
         false                       // Don't start immediately.
     );

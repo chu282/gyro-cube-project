@@ -1,7 +1,11 @@
 #include "cube_math.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "math.h"
 
+extern uint8_t* back_buf;
+extern uint8_t* front_buf;
 
 // ---------------------------------------------------------------------------
 // ROTATION FUNCTIONS
@@ -76,5 +80,5 @@ void draw_line(int x0, int y0, int x1, int y1, char color) {
 //Clear Screen
 // ---------------------------------------------------------------------------
 void clear_screen(void) {
-    memset(vga_data, 0, TXCOUNT);
+    memset(back_buf, 0, TXCOUNT);
 }

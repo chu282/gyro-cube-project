@@ -60,6 +60,9 @@ static uint32_t s_btn_lock_ms   = 0;
 extern uint vsync_sm;
 extern PIO pio;
 extern volatile bool vsync_flag;
+extern uint8_t* front_buf;
+extern uint8_t* back_buf;
+extern uint8_t* address_pointer;
 
 // ---------------------------------------------------------------------------
 // ERROR
@@ -258,17 +261,25 @@ void cube_run(void) {
         }
 
         // ---- RENDER ----
-        while (!vsync_flag);
-        vsync_flag = false;
         clear_screen();
-
         for (int i = 0; i < s_model.num_edges; i++) {
             Point3D *a = &projected[s_model.edges[i][0]];
             Point3D *b = &projected[s_model.edges[i][1]];
-
+            
             draw_line((int)a->x, (int)a->y,
-                      (int)b->x, (int)b->y,
-                      DRAW_COLOR);
+            (int)b->x, (int)b->y,
+            DRAW_COLOR);
         }
+
+        // ---- WAIT FOR FRAME FINISH ----
+        while (!vsync_flag) tight_loop_contents();
+        vsync_flag = false;
+
+        // ---- SWAP BUFFERS ----
+        uint8_t* temp = front_buf;
+        front_buf = back_buf;
+        back_buf = temp;
+
+        address_pointer = front_buf;
     }
 }
