@@ -137,7 +137,7 @@ void init_vga() {
         rgb_chan_0,                 // Channel to be configured
         &c0,                        // The configuration we just created
         &pio->txf[rgb_sm],          // write address (RGB PIO TX FIFO)
-        &front_buf,              // The initial read address (pixel color array)
+        &front_buf,                 // The initial read address (pixel color array)
         TXCOUNT,                    // Number of transfers; in this case each is 1 byte.
         false                       // Don't start immediately.
     );

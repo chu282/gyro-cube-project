@@ -61,4 +61,3 @@ void clear_screen(void);
 // at link time from main.c's translation unit.
 // ---------------------------------------------------------------------------
 extern void draw_pixel(int x, int y, char color);
-extern char vga_data[];
