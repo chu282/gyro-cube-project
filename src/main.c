@@ -8,6 +8,8 @@
 #include "cube.h"
 #include "cube_math.h"
 #include "zoom.h"
+#include "display.c"
+#include "chardisp.h"
 
 int main() {
     stdio_init_all();
@@ -35,6 +37,8 @@ int main() {
     
     // init_chardisp_pins();
     // cd_init();
+    // cd_display1("ECE 362 is the  ");
+
     cube_init();
     cube_run();
     // draw_colorboard();

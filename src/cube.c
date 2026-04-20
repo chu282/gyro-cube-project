@@ -197,9 +197,9 @@ void cube_init(void) {
 #endif
 
     // ---- IMU ----
-    s_i2c = IMU_I2C_PORT;
-    imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
-    s_cal = imu_calibrate(s_i2c, 200);
+    // s_i2c = IMU_I2C_PORT;
+    // imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
+    // s_cal = imu_calibrate(s_i2c, 200);
 
     // ---- BUTTONS ----
     gpio_init(BTN_HOME_PIN);
@@ -211,6 +211,7 @@ void cube_init(void) {
     gpio_pull_up(BTN_LOCK_PIN);
 
     zoom_init();
+    
 }
 
 // ---------------------------------------------------------------------------
@@ -240,19 +241,23 @@ void cube_run(void) {
         }
 
         // ---- IMU ----
-        if (!s_locked) {
-            IMUReading data = imu_read_accel(s_i2c, &s_cal, 10);
-            angle_x = data.ax / ACCEL_SCALE;
-            angle_y = data.ay / ACCEL_SCALE;
-        } else {
-            angle_x = s_locked_angle_x;
-            angle_y = s_locked_angle_y;
-        }
+        // if (!s_locked) {
+        //     IMUReading data = imu_read_accel(s_i2c, &s_cal, 10);
+        //     angle_x = data.ax / ACCEL_SCALE;
+        //     angle_y = data.ay / ACCEL_SCALE;
+        // } else {
+        //     angle_x = s_locked_angle_x;
+        //     angle_y = s_locked_angle_y;
+        // }
 
         // ---- TRANSFORM ----
         Point3D projected[MAX_VERTICES];
 
-        // float dynamic_fov = zoom_get_fov();
+        float dynamic_fov = zoom_get_fov();
+
+        angle_x = ((int)angle_x + 2) % 360;
+        angle_y = ((int)angle_y + 1) % 360;
+        angle_z = ((int)angle_z + 3) % 360;
 
         for (int i = 0; i < s_model.num_vertices; i++) {
             Point3D r = s_model.vertices[i];
@@ -260,7 +265,7 @@ void cube_run(void) {
             r = point3d_rotate_y(r, angle_y);
             r = point3d_rotate_z(r, angle_z);
             
-            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 200, PROJ_DISTANCE);
+            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, dynamic_fov, PROJ_DISTANCE);
         }
 
         // ---- RENDER ----
@@ -277,12 +282,14 @@ void cube_run(void) {
         // ---- WAIT FOR FRAME FINISH ----
         while (!vsync_flag) tight_loop_contents();
         vsync_flag = false;
-
+        
         // ---- SWAP BUFFERS ----
         uint8_t* temp = front_buf;
         front_buf = back_buf;
         back_buf = temp;
-
+        
         address_pointer = front_buf;
+        while (!vsync_flag) tight_loop_contents();
+        vsync_flag = false;
     }
 }
