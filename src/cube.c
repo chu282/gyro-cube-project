@@ -3,7 +3,9 @@
 #include "zoom.h"
 #include "imu.h"
 #include "cube_math.h"
-// #include "sd_card.h"        // sd_init_driver()
+#include "ff.h"
+#include "diskio.h"
+#include "sd_spi.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include "pico/platform.h"  // tight_loop_contents()
@@ -32,10 +34,9 @@
 #define PROJ_DISTANCE     20.0f
 
 #define ACCEL_SCALE  256.0f
+#define DT 0.01f              // 10 ms loop (~100 Hz)
+#define ALPHA 0.98f          // gyro weight
 
-// #define HOME_ANGLE_X   45.0f
-// #define HOME_ANGLE_Y  -35.264f
-// #define HOME_ANGLE_Z    0.0f
 #define HOME_ANGLE_X   10.0f
 #define HOME_ANGLE_Y  100.0f
 #define HOME_ANGLE_Z    30.0f
@@ -96,67 +97,68 @@ static bool button_fell(uint pin, bool *prev, uint32_t *last_ms) {
 // Define USE_HARDCODED_MODEL to skip the SD card entirely and use the
 // built-in unit cube below.  Comment it out to load from model.bin instead.
 // ---------------------------------------------------------------------------
-#define USE_HARDCODED_MODEL
+// #define USE_HARDCODED_MODEL
 
 #ifdef USE_HARDCODED_MODEL
 // Unit cube: 8 vertices at (±1, ±1, ±1), 12 edges.
 // The projection in math.c adds SCREEN_WIDTH/2 and SCREEN_HEIGHT/2 as the
 // screen-centre offset, so the cube sits in the middle of the display.
-// static void load_hardcoded_cube(SimpleModel *model) {
-//     model->num_vertices = 8;
-//     model->num_edges    = 12;
+static void load_hardcoded_cube(SimpleModel *model) {
+    model->num_vertices = 8;
+    model->num_edges    = 12;
 
-//     // Vertices
-//     model->vertices[0] = (Point3D){ -1.0f, -1.0f, -1.0f };
-//     model->vertices[1] = (Point3D){  1.0f, -1.0f, -1.0f };
-//     model->vertices[2] = (Point3D){  1.0f,  1.0f, -1.0f };
-//     model->vertices[3] = (Point3D){ -1.0f,  1.0f, -1.0f };
-//     model->vertices[4] = (Point3D){ -1.0f, -1.0f,  1.0f };
-//     model->vertices[5] = (Point3D){  1.0f, -1.0f,  1.0f };
-//     model->vertices[6] = (Point3D){  1.0f,  1.0f,  1.0f };
-//     model->vertices[7] = (Point3D){ -1.0f,  1.0f,  1.0f };
+    // Vertices
+    model->vertices[0] = (Point3D){ -1.0f, -1.0f, -1.0f };
+    model->vertices[1] = (Point3D){  1.0f, -1.0f, -1.0f };
+    model->vertices[2] = (Point3D){  1.0f,  1.0f, -1.0f };
+    model->vertices[3] = (Point3D){ -1.0f,  1.0f, -1.0f };
+    model->vertices[4] = (Point3D){ -1.0f, -1.0f,  1.0f };
+    model->vertices[5] = (Point3D){  1.0f, -1.0f,  1.0f };
+    model->vertices[6] = (Point3D){  1.0f,  1.0f,  1.0f };
+    model->vertices[7] = (Point3D){ -1.0f,  1.0f,  1.0f };
 
-//     // Edges: back face, front face, then 4 connecting pillars
-//     model->edges[0][0] = 0; model->edges[0][1] = 1;   // back bottom
-//     model->edges[1][0] = 1; model->edges[1][1] = 2;   // back right
-//     model->edges[2][0] = 2; model->edges[2][1] = 3;   // back top
-//     model->edges[3][0] = 3; model->edges[3][1] = 0;   // back left
+    // Edges: back face, front face, then 4 connecting pillars
+    model->edges[0][0] = 0; model->edges[0][1] = 1;   // back bottom
+    model->edges[1][0] = 1; model->edges[1][1] = 2;   // back right
+    model->edges[2][0] = 2; model->edges[2][1] = 3;   // back top
+    model->edges[3][0] = 3; model->edges[3][1] = 0;   // back left
 
-//     model->edges[4][0] = 4; model->edges[4][1] = 5;   // front bottom
-//     model->edges[5][0] = 5; model->edges[5][1] = 6;   // front right
-//     model->edges[6][0] = 6; model->edges[6][1] = 7;   // front top
-//     model->edges[7][0] = 7; model->edges[7][1] = 4;   // front left
+    model->edges[4][0] = 4; model->edges[4][1] = 5;   // front bottom
+    model->edges[5][0] = 5; model->edges[5][1] = 6;   // front right
+    model->edges[6][0] = 6; model->edges[6][1] = 7;   // front top
+    model->edges[7][0] = 7; model->edges[7][1] = 4;   // front left
 
-//     model->edges[8][0]  = 0; model->edges[8][1]  = 4;  // pillar bottom-left
-//     model->edges[9][0]  = 1; model->edges[9][1]  = 5;  // pillar bottom-right
-//     model->edges[10][0] = 2; model->edges[10][1] = 6;  // pillar top-right
-//     model->edges[11][0] = 3; model->edges[11][1] = 7;  // pillar top-left
-// }
-
-static void load_hardcoded_cube(SimpleModel *model) {model->num_vertices = 5;
-    model->num_edges    = 8;
-
-    // Vertices for the square base (resting at Y = -1.0)
-    model->vertices[0] = (Point3D){ -1.0f, -1.0f, -1.0f }; // Back-left
-    model->vertices[1] = (Point3D){  1.0f, -1.0f, -1.0f }; // Back-right
-    model->vertices[2] = (Point3D){  1.0f, -1.0f,  1.0f }; // Front-right
-    model->vertices[3] = (Point3D){ -1.0f, -1.0f,  1.0f }; // Front-left
-
-    // Vertex for the Apex (Tip of the pyramid, centered at Y = 1.0)
-    model->vertices[4] = (Point3D){  0.0f,  1.0f,  0.0f };
-
-    // Edges: The square base
-    model->edges[0][0] = 0; model->edges[0][1] = 1; // back edge
-    model->edges[1][0] = 1; model->edges[1][1] = 2; // right edge
-    model->edges[2][0] = 2; model->edges[2][1] = 3; // front edge
-    model->edges[3][0] = 3; model->edges[3][1] = 0; // left edge
-
-    // Edges: Connecting the base corners to the apex (vertex 4)
-    model->edges[4][0] = 0; model->edges[4][1] = 4; // back-left to tip
-    model->edges[5][0] = 1; model->edges[5][1] = 4; // back-right to tip
-    model->edges[6][0] = 2; model->edges[6][1] = 4; // front-right to tip
-    model->edges[7][0] = 3; model->edges[7][1] = 4; // front-left to tip
+    model->edges[8][0]  = 0; model->edges[8][1]  = 4;  // pillar bottom-left
+    model->edges[9][0]  = 1; model->edges[9][1]  = 5;  // pillar bottom-right
+    model->edges[10][0] = 2; model->edges[10][1] = 6;  // pillar top-right
+    model->edges[11][0] = 3; model->edges[11][1] = 7;  // pillar top-left
 }
+
+// static void load_hardcoded_cube(SimpleModel *model) {model->num_vertices = 5;
+//     //Tetrahedron NOT Cube
+//     model->num_edges    = 8;
+
+//     // Vertices for the square base (resting at Y = -1.0)
+//     model->vertices[0] = (Point3D){ -1.0f, -1.0f, -1.0f }; // Back-left
+//     model->vertices[1] = (Point3D){  1.0f, -1.0f, -1.0f }; // Back-right
+//     model->vertices[2] = (Point3D){  1.0f, -1.0f,  1.0f }; // Front-right
+//     model->vertices[3] = (Point3D){ -1.0f, -1.0f,  1.0f }; // Front-left
+
+//     // Vertex for the Apex (Tip of the pyramid, centered at Y = 1.0)
+//     model->vertices[4] = (Point3D){  0.0f,  1.0f,  0.0f };
+
+//     // Edges: The square base
+//     model->edges[0][0] = 0; model->edges[0][1] = 1; // back edge
+//     model->edges[1][0] = 1; model->edges[1][1] = 2; // right edge
+//     model->edges[2][0] = 2; model->edges[2][1] = 3; // front edge
+//     model->edges[3][0] = 3; model->edges[3][1] = 0; // left edge
+
+//     // Edges: Connecting the base corners to the apex (vertex 4)
+//     model->edges[4][0] = 0; model->edges[4][1] = 4; // back-left to tip
+//     model->edges[5][0] = 1; model->edges[5][1] = 4; // back-right to tip
+//     model->edges[6][0] = 2; model->edges[6][1] = 4; // front-right to tip
+//     model->edges[7][0] = 3; model->edges[7][1] = 4; // front-left to tip
+// }
 #endif  // USE_HARDCODED_MODEL
 
 // ---------------------------------------------------------------------------
@@ -166,6 +168,14 @@ static void load_hardcoded_cube(SimpleModel *model) {model->num_vertices = 5;
 static bool simple_model_load_bin(const char *path, SimpleModel *model) {
     FIL file;
     UINT br;
+    FATFS fs;
+    FRESULT fr;
+
+    fr = f_mount(&fs, "", 1);
+    if (fr != FR_OK) {
+        printf("Mount failed: %d\n", fr);
+        while (1);
+    }
 
     if (f_open(&file, path, FA_READ) != FR_OK) return false;
 
@@ -213,11 +223,11 @@ void cube_init(void) {
 #ifdef USE_HARDCODED_MODEL
     load_hardcoded_cube(&s_model);          // no SD card needed
 #else
-    if (!sd_init_driver()) {
-        halt_with_error("SD init failed");
-    }
+    // if (!sd_init_driver()) {
+    //     halt_with_error("SD init failed");
+    // }
     if (!simple_model_load_bin(MODEL_PATH, &s_model)) {
-        halt_with_error("Failed to load model.bin");
+        printf("Failed to load model.bin");
     }
 #endif
 
@@ -266,15 +276,28 @@ void cube_run(void) {
         }
 
         // ---- IMU ----
-        // if (!s_locked) {
-        //     IMUReading data = imu_read_accel(s_i2c, &s_cal, 10);
-        //     angle_x = data.ax / ACCEL_SCALE;
-        //     angle_y = data.ay / ACCEL_SCALE;
-        // } else {
-        //     angle_x = s_locked_angle_x;
-        //     angle_y = s_locked_angle_y;
-        // }
+        if (!s_locked) {
+            IMUReading data = imu_read_accel(s_i2c, &s_cal, 10);
 
+            printf("AX: %.2f AY: %.2f GX: %.2f GY: %.2f\n",
+       data.ax, data.ay, data.gx, data.gy);
+
+            // --- ACCEL ANGLES (tilt) ---
+            float accel_angle_x = atan2f(data.ay, data.az) * 57.2958f;
+            float accel_angle_y = atan2f(-data.ax, data.az) * 57.2958f;
+
+            // --- GYRO INTEGRATION ---
+            angle_x += data.gx * DT;
+            angle_y += data.gy * DT;
+            angle_z += data.gz * DT;
+
+            // --- COMPLEMENTARY FILTER ---
+            angle_x = ALPHA * angle_x + (1.0f - ALPHA) * accel_angle_x;
+            angle_y = ALPHA * angle_y + (1.0f - ALPHA) * accel_angle_y;
+        } else {
+            angle_x = s_locked_angle_x;
+            angle_y = s_locked_angle_y;
+        }
         // ---- TRANSFORM ----
         Point3D projected[MAX_VERTICES];
 
