@@ -34,7 +34,6 @@
 #define PROJ_DISTANCE     3.0f
 
 #define ACCEL_SCALE  256.0f
-#define DT 0.01f              // 10 ms loop (~100 Hz)
 #define ALPHA 0.98f          // gyro weight
 
 #define HOME_ANGLE_X   45.0f
@@ -206,9 +205,9 @@ void cube_init(void) {
 #endif
 
     // ---- IMU ----
-    // s_i2c = IMU_I2C_PORT;
-    // imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
-    // s_cal = imu_calibrate(s_i2c, 200);
+    s_i2c = IMU_I2C_PORT;
+    imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
+    s_cal = imu_calibrate(s_i2c, 200);
 
     // // ---- BUTTONS ----
     // gpio_init(BTN_HOME_PIN);
@@ -232,7 +231,7 @@ void cube_run(void) {
     float angle_y = HOME_ANGLE_Y;
     float angle_z = HOME_ANGLE_Z;
 
-    printf("CUBE_RUN\n");
+    absolute_time_t last_time = get_absolute_time();
 
     while (1) {
 
@@ -259,18 +258,25 @@ void cube_run(void) {
             printf("AX: %.2f AY: %.2f GX: %.2f GY: %.2f\n",
        data.ax, data.ay, data.gx, data.gy);
 
-            // --- ACCEL ANGLES (tilt) ---
-            float accel_angle_x = atan2f(data.ay, data.az) * 57.2958f;
-            float accel_angle_y = atan2f(-data.ax, data.az) * 57.2958f;
+            absolute_time_t now = get_absolute_time();
+            float dt = absolute_time_diff_us(last_time, now) / 1000000.0f;
+            last_time = now;
 
-            // --- GYRO INTEGRATION ---
-            angle_x += data.gx * DT;
-            angle_y += data.gy * DT;
-            angle_z += data.gz * DT;
+            // --- ACCEL ANGLES ---
+            float accel_angle_x = atan2f(data.ay, data.az) * 57.2958f;
+            float accel_angle_y = atan2f(-data.ax, sqrtf(data.ay * data.ay + data.az * data.az)) * 57.2958f;
+
+            // --- GYRO (deg/sec assumed) ---
+            float gx = data.gx;
+            float gy = data.gy;
+            float gz = data.gz;
 
             // --- COMPLEMENTARY FILTER ---
-            angle_x = ALPHA * angle_x + (1.0f - ALPHA) * accel_angle_x;
-            angle_y = ALPHA * angle_y + (1.0f - ALPHA) * accel_angle_y;
+            angle_x = ALPHA * (angle_x + gx * dt) + (1.0f - ALPHA) * accel_angle_x;
+            angle_y = ALPHA * (angle_y + gy * dt) + (1.0f - ALPHA) * accel_angle_y;
+
+            // Yaw (still drifts)
+            angle_z += gz * dt;
         } else {
             angle_x = s_locked_angle_x;
             angle_y = s_locked_angle_y;
@@ -281,9 +287,14 @@ void cube_run(void) {
 
         float dynamic_fov = zoom_get_fov();
 
-        angle_x = ((int)angle_x + 2) % 360;
-        angle_y = ((int)angle_y + 1) % 360;
-        angle_z = ((int)angle_z + 3) % 360;
+        if (angle_x > 180) angle_x -= 360;
+        if (angle_x < -180) angle_x += 360;
+
+        if (angle_y > 180) angle_y -= 360;
+        if (angle_y < -180) angle_y += 360;
+
+        if (angle_z > 180) angle_z -= 360;
+        if (angle_z < -180) angle_z += 360;
 
         for (int i = 0; i < s_model.num_vertices; i++) {
             Point3D r = s_model.vertices[i];
