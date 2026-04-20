@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include "hardware/pio.h"
 #include "hardware/dma.h"
+#include "ff.h"
+#include "diskio.h"
+#include "sd_spi.h"
 #include "vga.h"
 #include "imu.h"
 #include "cube.h"
@@ -11,9 +14,10 @@
 
 int main() {
     stdio_init_all();
+    sleep_ms(2000);
 
     // initialize VGA
-    init_vga();
+    // init_vga();
 
     // ====== Test Display ======
     // draw_rect(100, 100, 100, 100, WHITE);
@@ -33,7 +37,7 @@ int main() {
     //     }
     // }
     
-    printf("heljkfldsjsdf");
+    // printf("heljkfldsjsdf");
     cube_init();
     cube_run();
     // draw_colorboard();

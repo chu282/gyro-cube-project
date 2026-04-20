@@ -30,3 +30,5 @@ void cube_init(void);
 // maps the readings to rotation angles, and renders the wireframe cube.
 // This function does not return.
 void cube_run(void);
+
+void print_model(SimpleModel *model);

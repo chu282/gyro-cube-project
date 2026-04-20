@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 typedef struct {
     float ax, ay, az;
+    float gx, gy, gz;
 } IMUReading;
 
 // Initialize the MPU6050 and the I2C peripheral.

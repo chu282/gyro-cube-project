@@ -3,7 +3,9 @@
 #include "zoom.h"
 #include "imu.h"
 #include "cube_math.h"
-// #include "sd_card.h"        // sd_init_driver()
+#include "ff.h"
+#include "diskio.h"
+#include "sd_spi.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
 #include "pico/platform.h"  // tight_loop_contents()
@@ -32,6 +34,8 @@
 #define PROJ_DISTANCE     2.0f
 
 #define ACCEL_SCALE  256.0f
+#define DT 0.01f              // 10 ms loop (~100 Hz)
+#define ALPHA 0.98f          // gyro weight
 
 #define HOME_ANGLE_X   45.0f
 #define HOME_ANGLE_Y  -35.264f
@@ -90,7 +94,7 @@ static bool button_fell(uint pin, bool *prev, uint32_t *last_ms) {
 // Define USE_HARDCODED_MODEL to skip the SD card entirely and use the
 // built-in unit cube below.  Comment it out to load from model.bin instead.
 // ---------------------------------------------------------------------------
-#define USE_HARDCODED_MODEL
+// #define USE_HARDCODED_MODEL
 
 #ifdef USE_HARDCODED_MODEL
 // Unit cube: 8 vertices at (±1, ±1, ±1), 12 edges.
@@ -135,6 +139,14 @@ static void load_hardcoded_cube(SimpleModel *model) {
 static bool simple_model_load_bin(const char *path, SimpleModel *model) {
     FIL file;
     UINT br;
+    FATFS fs;
+    FRESULT fr;
+
+    fr = f_mount(&fs, "", 1);
+    if (fr != FR_OK) {
+        printf("Mount failed: %d\n", fr);
+        while (1);
+    }
 
     if (f_open(&file, path, FA_READ) != FR_OK) return false;
 
@@ -182,11 +194,11 @@ void cube_init(void) {
 #ifdef USE_HARDCODED_MODEL
     load_hardcoded_cube(&s_model);          // no SD card needed
 #else
-    if (!sd_init_driver()) {
-        halt_with_error("SD init failed");
-    }
+    // if (!sd_init_driver()) {
+    //     halt_with_error("SD init failed");
+    // }
     if (!simple_model_load_bin(MODEL_PATH, &s_model)) {
-        halt_with_error("Failed to load model.bin");
+        printf("Failed to load model.bin");
     }
 #endif
 
@@ -195,16 +207,18 @@ void cube_init(void) {
     imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
     s_cal = imu_calibrate(s_i2c, 200);
 
-    // ---- BUTTONS ----
-    gpio_init(BTN_HOME_PIN);
-    gpio_set_dir(BTN_HOME_PIN, GPIO_IN);
-    gpio_pull_up(BTN_HOME_PIN);
+    // // ---- BUTTONS ----
+    // gpio_init(BTN_HOME_PIN);
+    // gpio_set_dir(BTN_HOME_PIN, GPIO_IN);
+    // gpio_pull_up(BTN_HOME_PIN);
 
-    gpio_init(BTN_LOCK_PIN);
-    gpio_set_dir(BTN_LOCK_PIN, GPIO_IN);
-    gpio_pull_up(BTN_LOCK_PIN);
+    // gpio_init(BTN_LOCK_PIN);
+    // gpio_set_dir(BTN_LOCK_PIN, GPIO_IN);
+    // gpio_pull_up(BTN_LOCK_PIN);
 
-    zoom_init();
+    // zoom_init();
+
+    print_model(&s_model);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +228,8 @@ void cube_run(void) {
     float angle_x = HOME_ANGLE_X;
     float angle_y = HOME_ANGLE_Y;
     float angle_z = HOME_ANGLE_Z;
+
+    printf("CUBE_RUN\n");
 
     while (1) {
 
@@ -236,8 +252,22 @@ void cube_run(void) {
         // ---- IMU ----
         if (!s_locked) {
             IMUReading data = imu_read_accel(s_i2c, &s_cal, 10);
-            angle_x = data.ax / ACCEL_SCALE;
-            angle_y = data.ay / ACCEL_SCALE;
+
+            printf("AX: %.2f AY: %.2f GX: %.2f GY: %.2f\n",
+       data.ax, data.ay, data.gx, data.gy);
+
+            // --- ACCEL ANGLES (tilt) ---
+            float accel_angle_x = atan2f(data.ay, data.az) * 57.2958f;
+            float accel_angle_y = atan2f(-data.ax, data.az) * 57.2958f;
+
+            // --- GYRO INTEGRATION ---
+            angle_x += data.gx * DT;
+            angle_y += data.gy * DT;
+            angle_z += data.gz * DT;
+
+            // --- COMPLEMENTARY FILTER ---
+            angle_x = ALPHA * angle_x + (1.0f - ALPHA) * accel_angle_x;
+            angle_y = ALPHA * angle_y + (1.0f - ALPHA) * accel_angle_y;
         } else {
             angle_x = s_locked_angle_x;
             angle_y = s_locked_angle_y;
@@ -258,17 +288,42 @@ void cube_run(void) {
         }
 
         // ---- RENDER ----
-        while (!vsync_flag);
-        vsync_flag = false;
-        clear_screen();
+        // while (!vsync_flag);
+        // vsync_flag = false;
+        // clear_screen();
 
-        for (int i = 0; i < s_model.num_edges; i++) {
-            Point3D *a = &projected[s_model.edges[i][0]];
-            Point3D *b = &projected[s_model.edges[i][1]];
+        // for (int i = 0; i < s_model.num_edges; i++) {
+        //     Point3D *a = &projected[s_model.edges[i][0]];
+        //     Point3D *b = &projected[s_model.edges[i][1]];
 
-            draw_line((int)a->x, (int)a->y,
-                      (int)b->x, (int)b->y,
-                      DRAW_COLOR);
-        }
+        //     draw_line((int)a->x, (int)a->y,
+        //               (int)b->x, (int)b->y,
+        //               DRAW_COLOR);
+        // }
+        sleep_ms(100);
+    }
+}
+
+void print_model(SimpleModel *model)
+{
+    printf("SimpleModel:\n");
+    printf("  Number of vertices: %d\n", model->num_vertices);
+    printf("  Number of edges: %d\n", model->num_edges);
+
+    printf("\n  Vertices:\n");
+    for (int i = 0; i < model->num_vertices; i++) {
+        printf("    [%d] (%.2f, %.2f, %.2f)\n",
+               i,
+               model->vertices[i].x,
+               model->vertices[i].y,
+               model->vertices[i].z);
+    }
+
+    printf("\n  Edges:\n");
+    for (int i = 0; i < model->num_edges; i++) {
+        printf("    [%d] (%d -> %d)\n",
+               i,
+               model->edges[i][0],
+               model->edges[i][1]);
     }
 }

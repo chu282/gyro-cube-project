@@ -2,6 +2,7 @@
 #include "hardware/i2c.h"
 #include "hardware/gpio.h"
 #include "pico/stdlib.h"
+#include <stdio.h>
 
 // ---------------------------------------------------------------------------
 // MPU6050 REGISTER MAP
@@ -12,6 +13,7 @@
 #define MPU_GYRO_CONFIG     0x1B
 #define MPU_ACCEL_CONFIG    0x1C
 #define MPU_ACCEL_XOUT_H    0x3B
+#define MPU_GYRO_XOUT_H     0x43
 
 // ---------------------------------------------------------------------------
 // LOW-LEVEL I2C HELPERS (static — not exposed outside this file)
@@ -30,6 +32,14 @@ static void mpu_read(i2c_inst_t *i2c, uint8_t reg, uint8_t *buf, uint8_t len) {
 static void mpu_read_accel_raw(i2c_inst_t *i2c, int16_t out[3]) {
     uint8_t buf[6];
     mpu_read(i2c, MPU_ACCEL_XOUT_H, buf, 6);
+    out[0] = (int16_t)((buf[0] << 8) | buf[1]);   // X
+    out[1] = (int16_t)((buf[2] << 8) | buf[3]);   // Y
+    out[2] = (int16_t)((buf[4] << 8) | buf[5]);   // Z
+}
+
+static void mpu_read_gyro_raw(i2c_inst_t *i2c, int16_t out[3]) {
+    uint8_t buf[6];
+    mpu_read(i2c, MPU_GYRO_XOUT_H, buf, 6);
     out[0] = (int16_t)((buf[0] << 8) | buf[1]);   // X
     out[1] = (int16_t)((buf[2] << 8) | buf[3]);   // Y
     out[2] = (int16_t)((buf[4] << 8) | buf[5]);   // Z
@@ -72,6 +82,8 @@ IMUReading imu_calibrate(i2c_inst_t *i2c, int n_samples) {
     int32_t sum[3] = {0, 0, 0};
     int16_t raw[3];
 
+    printf("Calibrating IMU\n");
+
     for (int i = 0; i < n_samples; i++) {
         mpu_read_accel_raw(i2c, raw);
         sum[0] += raw[0];
@@ -88,20 +100,35 @@ IMUReading imu_calibrate(i2c_inst_t *i2c, int n_samples) {
 }
 
 IMUReading imu_read_accel(i2c_inst_t *i2c, const IMUReading *cal, int n_samples) {
-    int32_t sum[3] = {0, 0, 0};
-    int16_t raw[3];
+    int32_t sum_a[3] = {0, 0, 0};
+    int32_t sum_g[3] = {0, 0, 0};
+
+    int16_t raw_a[3];
+    int16_t raw_g[3];
 
     for (int i = 0; i < n_samples; i++) {
-        mpu_read_accel_raw(i2c, raw);
-        sum[0] += raw[0];
-        sum[1] += raw[1];
-        sum[2] += raw[2];
+        mpu_read_accel_raw(i2c, raw_a);
+        mpu_read_gyro_raw(i2c, raw_g);
+
+        sum_a[0] += raw_a[0];
+        sum_a[1] += raw_a[1];
+        sum_a[2] += raw_a[2];
+
+        sum_g[0] += raw_g[0];
+        sum_g[1] += raw_g[1];
+        sum_g[2] += raw_g[2];
     }
 
-    // Average then subtract the at-rest calibration baseline
+    // Convert gyro: ±250°/s → 131 LSB per °/s
+    const float GYRO_SCALE = 131.0f;
+
     return (IMUReading){
-        .ax = (sum[0] / (float)n_samples) - cal->ax,
-        .ay = (sum[1] / (float)n_samples) - cal->ay,
-        .az = (sum[2] / (float)n_samples) - cal->az,
+        .ax = (sum_a[0] / (float)n_samples) - cal->ax,
+        .ay = (sum_a[1] / (float)n_samples) - cal->ay,
+        .az = (sum_a[2] / (float)n_samples) - cal->az,
+
+        .gx = (sum_g[0] / (float)n_samples) / GYRO_SCALE,
+        .gy = (sum_g[1] / (float)n_samples) / GYRO_SCALE,
+        .gz = (sum_g[2] / (float)n_samples) / GYRO_SCALE,
     };
 }
