@@ -31,7 +31,7 @@
 // PROJECTION
 // ---------------------------------------------------------------------------
 #define PROJ_FOV        300.0f
-#define PROJ_DISTANCE     2.0f
+#define PROJ_DISTANCE     3.0f
 
 #define ACCEL_SCALE  256.0f
 #define DT 0.01f              // 10 ms loop (~100 Hz)
@@ -64,6 +64,9 @@ static uint32_t s_btn_lock_ms   = 0;
 extern uint vsync_sm;
 extern PIO pio;
 extern volatile bool vsync_flag;
+extern uint8_t* front_buf;
+extern uint8_t* back_buf;
+extern uint8_t* address_pointer;
 
 // ---------------------------------------------------------------------------
 // ERROR
@@ -203,9 +206,9 @@ void cube_init(void) {
 #endif
 
     // ---- IMU ----
-    s_i2c = IMU_I2C_PORT;
-    imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
-    s_cal = imu_calibrate(s_i2c, 200);
+    // s_i2c = IMU_I2C_PORT;
+    // imu_init(s_i2c, IMU_SDA_PIN, IMU_SCL_PIN, IMU_BAUD);
+    // s_cal = imu_calibrate(s_i2c, 200);
 
     // // ---- BUTTONS ----
     // gpio_init(BTN_HOME_PIN);
@@ -278,13 +281,17 @@ void cube_run(void) {
 
         float dynamic_fov = zoom_get_fov();
 
+        angle_x = ((int)angle_x + 2) % 360;
+        angle_y = ((int)angle_y + 1) % 360;
+        angle_z = ((int)angle_z + 3) % 360;
+
         for (int i = 0; i < s_model.num_vertices; i++) {
             Point3D r = s_model.vertices[i];
             r = point3d_rotate_x(r, angle_x);
             r = point3d_rotate_y(r, angle_y);
             r = point3d_rotate_z(r, angle_z);
             
-            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, 100, PROJ_DISTANCE);
+            projected[i] = point3d_project(r, SCREEN_WIDTH, SCREEN_HEIGHT, dynamic_fov, PROJ_DISTANCE);
         }
 
         // ---- RENDER ----

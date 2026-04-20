@@ -13,7 +13,7 @@
 // ----- //
 
 #define hsync_wrap_target 1
-#define hsync_wrap 7
+#define hsync_wrap 8
 #define hsync_pio_version 0
 
 static const uint16_t hsync_program_instructions[] = {
@@ -22,17 +22,18 @@ static const uint16_t hsync_program_instructions[] = {
     0xa027, //  1: mov    x, osr
     0x0042, //  2: jmp    x--, 2
     0xff00, //  3: set    pins, 0                [31]
-    0xff01, //  4: set    pins, 1                [31]
-    0xff01, //  5: set    pins, 1                [31]
-    0xed01, //  6: set    pins, 1                [13]
-    0xc100, //  7: irq    nowait 0               [1]
+    0xff00, //  4: set    pins, 0                [31]
+    0xff00, //  5: set    pins, 0                [31]
+    0xff01, //  6: set    pins, 1                [31]
+    0xec01, //  7: set    pins, 1                [12]
+    0xc100, //  8: irq    nowait 0               [1]
             //     .wrap
 };
 
 #if !PICO_NO_HARDWARE
 static const struct pio_program hsync_program = {
     .instructions = hsync_program_instructions,
-    .length = 8,
+    .length = 9,
     .origin = -1,
     .pio_version = hsync_pio_version,
 #if PICO_PIO_VERSION > 0
@@ -56,7 +57,7 @@ static inline void hsync_program_init(PIO pio, uint sm, uint offset, uint pin) {
     // parameter to this function.
     sm_config_set_set_pins(&c, pin, 1);
     // Set clock division (div by 5 for 25 MHz state machine)
-    sm_config_set_clkdiv(&c, 3.0f) ;
+    sm_config_set_clkdiv(&c, 6) ;
     // Set this pin's GPIO function (connect PIO to the pad)
     pio_gpio_init(pio, pin);
     // pio_gpio_init(pio, pin+1);
