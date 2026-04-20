@@ -5,10 +5,10 @@
 
 /* ---------- CONFIG ---------- */
 #define SD_SPI spi0
-#define PIN_MISO 16
-#define PIN_MOSI 19
-#define PIN_SCK  18
-#define PIN_CS   17
+#define PIN_MISO 32
+#define PIN_MOSI 35
+#define PIN_SCK  34
+#define PIN_CS   33
 
 /* ---------- LOW LEVEL ---------- */
 

@@ -78,26 +78,95 @@ void imu_init(i2c_inst_t *i2c, uint sda_pin, uint scl_pin, uint baud) {
     mpu_write(i2c, MPU_ACCEL_CONFIG, 0x00);
 }
 
-IMUReading imu_calibrate(i2c_inst_t *i2c, int n_samples) {
-    int32_t sum[3] = {0, 0, 0};
-    int16_t raw[3];
+// IMUReading imu_calibrate(i2c_inst_t *i2c, int n_samples) {
+//     int32_t sum[3] = {0, 0, 0};
+//     int16_t raw[3];
 
-    printf("Calibrating IMU\n");
+//     printf("Calibrating IMU\n");
+
+//     for (int i = 0; i < n_samples; i++) {
+//         mpu_read_accel_raw(i2c, raw);
+//         sum[0] += raw[0];
+//         sum[1] += raw[1];
+//         sum[2] += raw[2];
+//         sleep_ms(2);   // ~500 Hz — spread samples to catch low-freq vibration
+//     }
+
+//     return (IMUReading){
+//         .ax = sum[0] / (float)n_samples,
+//         .ay = sum[1] / (float)n_samples,
+//         .az = sum[2] / (float)n_samples,
+//     };
+// }
+
+IMUReading imu_calibrate(i2c_inst_t *i2c, int n_samples) {
+    int32_t sum_a[3] = {0, 0, 0};
+    int32_t sum_g[3] = {0, 0, 0};
+    int16_t raw_a[3];
+    int16_t raw_g[3];
+
+    printf("Calibrating IMU - DO NOT MOVE\n");
 
     for (int i = 0; i < n_samples; i++) {
-        mpu_read_accel_raw(i2c, raw);
-        sum[0] += raw[0];
-        sum[1] += raw[1];
-        sum[2] += raw[2];
-        sleep_ms(2);   // ~500 Hz — spread samples to catch low-freq vibration
+        mpu_read_accel_raw(i2c, raw_a);
+        mpu_read_gyro_raw(i2c, raw_g);
+        
+        sum_a[0] += raw_a[0];
+        sum_a[1] += raw_a[1];
+        sum_a[2] += raw_a[2]; // Includes 1g of gravity if flat
+        
+        sum_g[0] += raw_g[0];
+        sum_g[1] += raw_g[1];
+        sum_g[2] += raw_g[2];
+        sleep_ms(2);   
     }
 
+    // Only calibrate X and Y accel to 0. Leave Z alone so gravity isn't erased.
     return (IMUReading){
-        .ax = sum[0] / (float)n_samples,
-        .ay = sum[1] / (float)n_samples,
-        .az = sum[2] / (float)n_samples,
+        .ax = sum_a[0] / (float)n_samples,
+        .ay = sum_a[1] / (float)n_samples,
+        .az = 0, // Do NOT subtract gravity bias here unless you know exactly what orientation it boots in
+
+        // Calculate the raw gyro bias (this is what fixes your drift)
+        .gx = sum_g[0] / (float)n_samples,
+        .gy = sum_g[1] / (float)n_samples,
+        .gz = sum_g[2] / (float)n_samples,
     };
 }
+
+// IMUReading imu_read_accel(i2c_inst_t *i2c, const IMUReading *cal, int n_samples) {
+//     int32_t sum_a[3] = {0, 0, 0};
+//     int32_t sum_g[3] = {0, 0, 0};
+
+//     int16_t raw_a[3];
+//     int16_t raw_g[3];
+
+//     for (int i = 0; i < n_samples; i++) {
+//         mpu_read_accel_raw(i2c, raw_a);
+//         mpu_read_gyro_raw(i2c, raw_g);
+
+//         sum_a[0] += raw_a[0];
+//         sum_a[1] += raw_a[1];
+//         sum_a[2] += raw_a[2];
+
+//         sum_g[0] += raw_g[0];
+//         sum_g[1] += raw_g[1];
+//         sum_g[2] += raw_g[2];
+//     }
+
+//     // Convert gyro: ±250°/s → 131 LSB per °/s
+//     const float GYRO_SCALE = 131.0f;
+
+//     return (IMUReading){
+//         .ax = (sum_a[0] / (float)n_samples) - cal->ax,
+//         .ay = (sum_a[1] / (float)n_samples) - cal->ay,
+//         .az = (sum_a[2] / (float)n_samples) - cal->az,
+
+//         .gx = (sum_g[0] / (float)n_samples) / GYRO_SCALE,
+//         .gy = (sum_g[1] / (float)n_samples) / GYRO_SCALE,
+//         .gz = (sum_g[2] / (float)n_samples) / GYRO_SCALE,
+//     };
+// }
 
 IMUReading imu_read_accel(i2c_inst_t *i2c, const IMUReading *cal, int n_samples) {
     int32_t sum_a[3] = {0, 0, 0};
@@ -119,16 +188,23 @@ IMUReading imu_read_accel(i2c_inst_t *i2c, const IMUReading *cal, int n_samples)
         sum_g[2] += raw_g[2];
     }
 
-    // Convert gyro: ±250°/s → 131 LSB per °/s
     const float GYRO_SCALE = 131.0f;
 
-    return (IMUReading){
-        .ax = (sum_a[0] / (float)n_samples) - cal->ax,
-        .ay = (sum_a[1] / (float)n_samples) - cal->ay,
-        .az = (sum_a[2] / (float)n_samples) - cal->az,
+    float phys_ax = (sum_a[0] / (float)n_samples) - cal->ax;
+    float phys_ay = (sum_a[1] / (float)n_samples) - cal->ay;
+    float phys_az = (sum_a[2] / (float)n_samples) - cal->az;
 
-        .gx = (sum_g[0] / (float)n_samples) / GYRO_SCALE,
-        .gy = (sum_g[1] / (float)n_samples) / GYRO_SCALE,
-        .gz = (sum_g[2] / (float)n_samples) / GYRO_SCALE,
+    float phys_gx = ((sum_g[0] / (float)n_samples) - cal->gx) / GYRO_SCALE;
+    float phys_gy = ((sum_g[1] / (float)n_samples) - cal->gy) / GYRO_SCALE;
+    float phys_gz = ((sum_g[2] / (float)n_samples) - cal->gz) / GYRO_SCALE;
+
+    return (IMUReading){
+        .ax = phys_ay,  
+        .ay = -phys_ax,  
+        .az = phys_az,  
+
+        .gx = phys_gy,
+        .gy = -phys_gx,  
+        .gz = phys_gz
     };
 }

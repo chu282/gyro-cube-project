@@ -8,7 +8,7 @@
 // ---------------------------------------------------------------------------
 #define MAX_VERTICES  64
 #define MAX_EDGES     128
-#define MODEL_PATH    "model.bin"
+#define MODEL_PATH    "cube.bin"
 
 // ---------------------------------------------------------------------------
 // SimpleModel
@@ -30,3 +30,6 @@ void cube_init(void);
 // maps the readings to rotation angles, and renders the wireframe cube.
 // This function does not return.
 void cube_run(void);
+
+void cube_isr_handler();
+void cube_irq_init();
