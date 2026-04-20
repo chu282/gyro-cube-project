@@ -8,8 +8,6 @@
 #include "cube.h"
 #include "cube_math.h"
 #include "zoom.h"
-#include "display.c"
-#include "chardisp.h"
 
 int main() {
     stdio_init_all();
